@@ -4,3 +4,4 @@ langchain
 openai
 pymongo
 pymysql
+python-dotenv
