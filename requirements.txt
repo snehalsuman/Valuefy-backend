@@ -8,3 +8,4 @@ pydantic-settings
 SQLAlchemy
 PyYAML
 requests
+pymongo
