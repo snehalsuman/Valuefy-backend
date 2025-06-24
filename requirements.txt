@@ -2,10 +2,14 @@ fastapi
 uvicorn
 langchain
 langchain-community
+langchain-core
+langchain-text-splitters
+langsmith
+openai
+pymongo
 python-dotenv
 pydantic
 pydantic-settings
 SQLAlchemy
 PyYAML
 requests
-pymongo
