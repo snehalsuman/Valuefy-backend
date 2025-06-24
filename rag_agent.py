@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import urllib.parse
 import os
 
-# ✅ Load environment variables
+
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
@@ -18,7 +18,6 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in .env. Please add your OpenRouter key.")
 
-# ✅ Initialize LangChain LLM using OpenRouter
 llm = ChatOpenAI(
     model="openai/gpt-3.5-turbo",
     temperature=0,
@@ -26,7 +25,7 @@ llm = ChatOpenAI(
     openai_api_base=OPENAI_BASE_URL
 )
 
-# ✅ Setup MySQL Database
+
 MYSQL_USER = "root"
 MYSQL_PASSWORD = urllib.parse.quote("Snehal@123")
 MYSQL_HOST = "localhost"
@@ -38,12 +37,12 @@ engine = create_engine(
 )
 db = SQLDatabase(engine)
 
-# ✅ Connect to MongoDB
+
 mongo_client = MongoClient("mongodb+srv://princek02032004:Snehal%401234@valuefy-cluster.spuzijz.mongodb.net/")
 mongo_db = mongo_client["valuefy"]
 client_collection = mongo_db["clients"]
 
-# ✅ Tool to query MongoDB
+
 def mongo_query_tool(query: str) -> str:
     if "high risk" in query.lower():
         clients = client_collection.find({"risk_appetite": "High"}, {"_id": 0, "name": 1, "investment_preferences": 1})
@@ -54,7 +53,6 @@ def mongo_query_tool(query: str) -> str:
     else:
         return "MongoDB tool only supports simple client profile queries (risk, name, preferences)."
 
-# ✅ Tool to find RM with highest investment
 def top_rm_tool(_: str) -> str:
     query = """
     SELECT relationship_manager, SUM(amount_invested) AS total_investment
@@ -65,7 +63,7 @@ def top_rm_tool(_: str) -> str:
     """
     return db.run(query)
 
-# ✅ Register tools
+
 tools = [
     Tool(
         name="MongoDBClientProfiles",
@@ -80,7 +78,7 @@ tools = [
     )
 ]
 
-# ✅ Initialize LangChain Agent
+
 agent_executor = initialize_agent(
     tools,
     llm,
@@ -89,7 +87,6 @@ agent_executor = initialize_agent(
     handle_parsing_errors=True
 )
 
-# ✅ Exposed function for FastAPI
 def query_agent(question: str) -> str:
     custom_prompt = f"""
     You are an assistant that answers questions using three tools:
