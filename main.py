@@ -89,13 +89,13 @@ def client_summary():
 async def ask_question(payload: dict):
     question = payload.get("question")
     if not question:
-        return {"error": "❌ Question not provided."}
+        return {"error": " Question not provided."}
 
     try:
         answer = query_agent(question)
         return {"answer": answer}
     except Exception as e:
-        print("❌ Error in query_agent:", e)
+        print(" Error in query_agent:", e)
         return {"error": f"LangChain agent failed: {str(e)}"}
 
 
@@ -103,14 +103,14 @@ async def ask_question(payload: dict):
 async def mcp_query(payload: dict):
     question = payload.get("question")
     if not question:
-        return {"error": "❌ Question not provided."}
+        return {"error": " Question not provided."}
 
     try:
         answer = query_mcp_agent(question)
-        print("🧠 MCP Answer:", answer) 
+        print(" MCP Answer:", answer) 
         if not answer:
             return {"answer": "MCP agent returned no output."}
         return {"answer": str(answer)}
     except Exception as e:
-        print("❌ Error in query_mcp_agent:", e)
+        print(" Error in query_mcp_agent:", e)
         return {"error": f"MCP agent failed: {str(e)}"}

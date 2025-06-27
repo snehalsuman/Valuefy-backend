@@ -8,7 +8,7 @@ This repository contains the backend implementation for the Natural Language Cro
 - MongoDB – for storing client profile information
 - MySQL – for storing transaction data
 - LangChain – for orchestrating multi-tool language model workflows
-- OpenRouter – as the LLM provider interface
+- Hugging Face Transformers – as the LLM provider (replacing OpenRouter AI)
 - SQLAlchemy, PyMySQL, PyMongo – for database operations
 
 ## Project Structure
@@ -34,8 +34,7 @@ MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=valuefy
-OPENROUTER_API_KEY=your_openrouter_key
-
+# No OpenRouter key needed; using Hugging Face model
 
 ## Installation and Setup
 
@@ -67,6 +66,12 @@ OPENROUTER_API_KEY=your_openrouter_key
 - Understands natural language financial queries.
 - Dynamically uses both MongoDB and MySQL through agent tools.
 - Supports structured reasoning using LangChain MCP agents.
+- Uses a Hugging Face model for all LLM tasks (no OpenRouter AI).
+
+## Frontend Integration
+
+- The frontend now features a minimal, professional navbar with text-only links (no logo, emojis, or profile section).
+- Backend endpoints support the navigation structure: Home, Transactions, Dashboard, and Ask Agent.
 
 ## Author
 

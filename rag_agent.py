@@ -1,3 +1,5 @@
+import torch
+from langchain_community.llms import HuggingFacePipeline
 from langchain_community.chat_models import ChatOpenAI
 from langchain_community.utilities import SQLDatabase
 from langchain_community.tools import QuerySQLDataBaseTool
@@ -9,21 +11,15 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 import urllib.parse
 import os
+from transformers import pipeline
 
 
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY not found in .env. Please add your OpenRouter key.")
-
-llm = ChatOpenAI(
-    model="openai/gpt-3.5-turbo",
-    temperature=0,
-    openai_api_key=OPENAI_API_KEY,
-    openai_api_base=OPENAI_BASE_URL
+hf_pipeline = pipeline(
+    "text2text-generation",
+    model="google/flan-t5-small",
+    max_new_tokens=128
 )
+llm = HuggingFacePipeline(pipeline=hf_pipeline)
 
 
 MYSQL_USER = "root"
@@ -44,14 +40,28 @@ client_collection = mongo_db["clients"]
 
 
 def mongo_query_tool(query: str) -> str:
-    if "high risk" in query.lower():
-        clients = client_collection.find({"risk_appetite": "High"}, {"_id": 0, "name": 1, "investment_preferences": 1})
-        return "\n".join([f"{c['name']}: {', '.join(c['investment_preferences'])}" for c in clients])
-    elif "clients" in query.lower():
+    q = query.lower()
+    
+    if any(k in q for k in ["high risk", "low risk", "medium risk"]):
+        risk = None
+        if "high risk" in q:
+            risk = "High"
+        elif "low risk" in q:
+            risk = "Low"
+        elif "medium risk" in q:
+            risk = "Medium"
+        if risk:
+            clients = client_collection.find({"risk_appetite": risk}, {"_id": 0, "name": 1, "investment_preferences": 1})
+            return "\n".join([f"{c['name']}: {', '.join(c['investment_preferences'])}" for c in clients])
+    
+    elif "risk" in q or "at risk" in q or "at risks" in q:
+        clients = client_collection.find({}, {"_id": 0, "name": 1, "risk_appetite": 1, "investment_preferences": 1})
+        return "\n".join([f"{c['name']} (Risk: {c.get('risk_appetite', 'N/A')}): {', '.join(c.get('investment_preferences', []))}" for c in clients])
+    elif any(k in q for k in ["clients", "profile", "name", "address", "rm", "relationship manager"]):
         clients = client_collection.find({}, {"_id": 0})
         return "\n".join([str(c) for c in clients])
     else:
-        return "MongoDB tool only supports simple client profile queries (risk, name, preferences)."
+        return "MongoDB tool only supports client profile queries (risk, name, preferences, address, RM)."
 
 def top_rm_tool(_: str) -> str:
     query = """
@@ -88,12 +98,63 @@ agent_executor = initialize_agent(
 )
 
 def query_agent(question: str) -> str:
-    custom_prompt = f"""
-    You are an assistant that answers questions using three tools:
-    - Use MongoDBClientProfiles for anything about client profile info (risk appetite, preferences, name, RM, etc.)
-    - Use SQL DB for transaction-related questions like amounts, dates, investment history.
-    - Use TopRMInvestment to find which RM manages the most investment.
+    q = question.lower()
 
-    Question: {question}
-    """
-    return agent_executor.run(custom_prompt)
+    # 1. Top five portfolios of wealth members
+    if "top five portfolios" in q or ("top 5" in q and "portfolio" in q):
+        query = (
+            "SELECT client_name, SUM(amount_invested) AS portfolio_value "
+            "FROM transactions GROUP BY client_name ORDER BY portfolio_value DESC LIMIT 5;"
+        )
+        return db.run(query)
+
+    # 2. Breakup of portfolio values per relationship manager
+    if (
+        ("breakup" in q or "portfolio" in q) and
+        ("relationship manager" in q or "rm" in q)
+    ):
+        query = (
+            "SELECT relationship_manager, SUM(amount_invested) AS total_portfolio_value "
+            "FROM transactions GROUP BY relationship_manager;"
+        )
+        return db.run(query)
+
+    # 3. Top relationship managers in the firm
+    if "top relationship manager" in q or ("top" in q and "relationship manager" in q):
+        query = (
+            "SELECT relationship_manager, SUM(amount_invested) AS total_investment "
+            "FROM transactions GROUP BY relationship_manager ORDER BY total_investment DESC LIMIT 5;"
+        )
+        return db.run(query)
+
+    # 4. Clients who are the highest holders of a specific stock
+    if "highest holder" in q or ("top" in q and "holder" in q and "stock" in q):
+        # Try to extract the stock name
+        import re
+        match = re.search(r"holder[s]? of ([\w\s]+)", q)
+        stock = match.group(1).strip() if match else None
+        if stock:
+            query = (
+                f"SELECT client_name, SUM(amount_invested) AS total_investment "
+                f"FROM transactions WHERE asset_name LIKE '%{stock}%' "
+                f"GROUP BY client_name ORDER BY total_investment DESC LIMIT 5;"
+            )
+            return db.run(query)
+        else:
+            return "Please specify the stock name."
+
+    # Portfolio/transaction-related queries
+    elif any(k in q for k in ["portfolio", "asset", "stock", "equity", "crypto", "mutual fund", "breakup", "summary", "amount", "transaction", "value"]):
+        return db.run(question)
+
+    # Profile-related queries
+    elif any(k in q for k in ["risk", "preference", "profile", "client detail", "name", "address", "rm", "relationship manager"]):
+        return mongo_query_tool(question)
+
+    # Top RM queries
+    elif any(k in q for k in ["top relationship manager", "most investment", "rm with most investment", "top rm"]):
+        return top_rm_tool(question)
+
+    # Fallback to SQL for anything else
+    else:
+        return db.run(question)
